@@ -34,3 +34,7 @@ There is global shared state. There is concurrency. There are incomplete tests. 
 2. Use AI freely, but you must validate and own every change.
 3. Prefer small patches + characterization tests over large rewrites.
 4. Keep a short notes.md of your prompts and reasoning if you want interview-style practice.
+
+## Solution
+
+A worked fix for all six issues lives on the [`solution`](../../tree/solution) branch. Try the exercise yourself first — that branch is a spoiler.
