@@ -1,8 +1,9 @@
-"""Background worker that processes a queue of tasks and has resource leaks (ISSUE-004)."""
+"""Background worker that processes a queue of tasks."""
 
 import threading
 import time
 import os
+import tempfile
 from queue import Queue, Empty
 from typing import Callable, Optional
 
@@ -13,26 +14,21 @@ class BackgroundWorker:
         self._queue: Queue = Queue()
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
-        self._open_files = []  # tracks files we opened and "forgot" to close
+        self._open_files = []
+        self._start_lock = threading.Lock()
 
     def start(self):
-        if self._thread and self._thread.is_alive():
-            return
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._run, name=self.name, daemon=True)
-        self._thread.start()
+        with self._start_lock:
+            if self._thread and self._thread.is_alive():
+                return
+            self._stop.clear()
+            self._thread = threading.Thread(target=self._run, name=self.name, daemon=True)
+            self._thread.start()
 
     def stop(self, timeout: float = 2.0):
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=timeout)
-        # BUG: we never close the files we opened
-        # for f in self._open_files:
-        #     try:
-        #         f.close()
-        #     except Exception:
-        #         pass
-        # self._open_files.clear()
 
     def submit(self, task: Callable, *args, **kwargs):
         self._queue.put((task, args, kwargs))
@@ -43,18 +39,23 @@ class BackgroundWorker:
                 task, args, kwargs = self._queue.get(timeout=0.1)
             except Empty:
                 continue
+            f = None
             try:
                 # simulate work that opens a file
-                path = f"/tmp/orderflow_worker_{os.getpid()}_{time.time()}.tmp"
+                path = os.path.join(
+                    tempfile.gettempdir(), f"orderflow_worker_{os.getpid()}_{time.time()}.tmp"
+                )
                 f = open(path, "w")
-                self._open_files.append(f)  # leak
+                self._open_files.append(f)
                 f.write("processing\n")
-                # intentionally do not close here
                 task(*args, **kwargs)
             except Exception as e:
-                # swallow — classic legacy pattern
                 print(f"[{self.name}] task error: {e}")
             finally:
+                if f is not None:
+                    f.close()
+                    if f in self._open_files:
+                        self._open_files.remove(f)
                 self._queue.task_done()
 
     def pending(self) -> int:

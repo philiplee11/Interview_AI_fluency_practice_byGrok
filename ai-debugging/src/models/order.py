@@ -30,5 +30,5 @@ class Order:
             "total": self.total,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "discount_code": self.discount_code,
-            "quantity": sum(i.quantity for i in self.items),  # denormalized for the buggy updater
+            "quantity": sum(i.quantity for i in self.items),
         }

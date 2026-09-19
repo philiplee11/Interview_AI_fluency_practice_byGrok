@@ -7,4 +7,4 @@ DB_PATH = ":memory:"  # in real life this was a file path
 
 # "Feature flags" that never got cleaned up
 USE_NEW_PRICING = True
-USE_LEGACY_DISCOUNT = False  # but some code still checks the old flag
+USE_LEGACY_DISCOUNT = False

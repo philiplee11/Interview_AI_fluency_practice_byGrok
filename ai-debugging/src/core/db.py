@@ -12,7 +12,7 @@ _order_counter = 0
 
 
 def reset():
-    """Test helper — not thread-safe on purpose in some paths."""
+    """Test helper."""
     global _orders, _inventory, _prices, _order_counter
     with _lock:
         _orders = {}
@@ -23,9 +23,9 @@ def reset():
 
 def next_order_id() -> str:
     global _order_counter
-    # BUG intentional: no lock around the increment in the hot path used by some callers
-    _order_counter += 1
-    return f"ORD-{_order_counter:05d}"
+    with _lock:
+        _order_counter += 1
+        return f"ORD-{_order_counter:05d}"
 
 
 def save_order(order_id: str, data: Dict[str, Any]) -> None:
@@ -37,17 +37,6 @@ def get_order(order_id: str) -> Optional[Dict[str, Any]]:
     with _lock:
         o = _orders.get(order_id)
         return copy.deepcopy(o) if o else None
-
-
-def update_order_field(order_id: str, field: str, value: Any) -> bool:
-    """Update a single field. Used by concurrent updaters."""
-    # BUG: lock is taken, but the read-modify-write pattern used by callers
-    # outside this function is not always protected.
-    with _lock:
-        if order_id not in _orders:
-            return False
-        _orders[order_id][field] = value
-        return True
 
 
 def list_orders() -> List[Dict[str, Any]]:
@@ -66,12 +55,36 @@ def get_stock(sku: str) -> int:
 
 
 def adjust_stock(sku: str, delta: int) -> int:
-    """Returns new stock level. Can go negative — that is one of the bugs."""
+    """Returns new stock level."""
     with _lock:
         current = _inventory.get(sku, 0)
         new = current + delta
         _inventory[sku] = new
         return new
+
+
+def apply_quantity_delta(order_id: str, delta: int) -> Optional[int]:
+    """Atomically read, apply delta, and write back an order's quantity.
+    Returns the new quantity, or None if the order does not exist."""
+    with _lock:
+        if order_id not in _orders:
+            return None
+        current = _orders[order_id].get("quantity", 0)
+        new_val = current + delta
+        _orders[order_id]["quantity"] = new_val
+        return new_val
+
+
+def try_reserve_stock(sku: str, qty: int) -> bool:
+    """Atomically check and reserve stock in one critical section."""
+    if qty < 0:
+        return False
+    with _lock:
+        current = _inventory.get(sku, 0)
+        if current < qty:
+            return False
+        _inventory[sku] = current - qty
+        return True
 
 
 def set_price(sku: str, price: float) -> None:
