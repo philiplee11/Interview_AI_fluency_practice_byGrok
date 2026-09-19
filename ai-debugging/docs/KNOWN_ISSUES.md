@@ -36,3 +36,5 @@ These are the symptoms reported by the "team". Use them as your starting point.
 ---
 
 **Your job:** Diagnose root causes with the help of AI, write the smallest correct fixes, and make the relevant tests pass. Do not rewrite the entire service.
+
+**Note:** this list may not be exhaustive.
