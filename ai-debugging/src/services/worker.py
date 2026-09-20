@@ -1,4 +1,4 @@
-"""Background worker that processes a queue of tasks and has resource leaks (ISSUE-004)."""
+"""Background worker that processes a queue of tasks."""
 
 import threading
 import time
@@ -13,7 +13,7 @@ class BackgroundWorker:
         self._queue: Queue = Queue()
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
-        self._open_files = []  # tracks files we opened and "forgot" to close
+        self._open_files = []
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -26,13 +26,6 @@ class BackgroundWorker:
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=timeout)
-        # BUG: we never close the files we opened
-        # for f in self._open_files:
-        #     try:
-        #         f.close()
-        #     except Exception:
-        #         pass
-        # self._open_files.clear()
 
     def submit(self, task: Callable, *args, **kwargs):
         self._queue.put((task, args, kwargs))
@@ -47,12 +40,10 @@ class BackgroundWorker:
                 # simulate work that opens a file
                 path = f"/tmp/orderflow_worker_{os.getpid()}_{time.time()}.tmp"
                 f = open(path, "w")
-                self._open_files.append(f)  # leak
+                self._open_files.append(f)
                 f.write("processing\n")
-                # intentionally do not close here
                 task(*args, **kwargs)
             except Exception as e:
-                # swallow — classic legacy pattern
                 print(f"[{self.name}] task error: {e}")
             finally:
                 self._queue.task_done()

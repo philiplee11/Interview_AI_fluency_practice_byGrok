@@ -12,7 +12,6 @@ def test_reserve_basic():
 
 
 def test_concurrent_reserve_does_not_go_negative():
-    """ISSUE-002: stock must never go negative under concurrent reserves."""
     inv = InventoryService()
     inv.set_stock("Y", 50)
 

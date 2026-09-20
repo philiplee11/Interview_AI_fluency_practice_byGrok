@@ -1,10 +1,10 @@
-"""Pricing service with a broken cache (ISSUE-003)."""
+"""Pricing service."""
 
 import time
 from typing import Optional, Dict, Tuple
 from src.core import db
 from src.core.config import CACHE_TTL_SECONDS, USE_NEW_PRICING
-from src.legacy.discount import legacy_discount  # still imported
+from src.legacy.discount import legacy_discount
 
 
 class PricingService:
@@ -16,8 +16,6 @@ class PricingService:
 
     def set_price(self, sku: str, price: float) -> None:
         db.set_price(sku, price)
-        # BUG: we do not invalidate the cache entry here
-        # self._cache.pop(sku, None)  # the correct line is commented out
 
     def get_price(self, sku: str) -> Optional[float]:
         now = time.time()
@@ -34,7 +32,7 @@ class PricingService:
         return price
 
     def calculate_total(self, order) -> float:
-        """Sum line items and apply discount. Sometimes applies discount twice."""
+        """Sum line items and apply discount."""
         subtotal = sum(li.unit_price * li.quantity for li in order.items)
         discount = 0.0
 
@@ -45,8 +43,6 @@ class PricingService:
             else:
                 discount = legacy_discount(subtotal, order.discount_code)
 
-            # BUG: in one code path the discount is applied a second time
-            # (left over from a refactor). Triggered when discount_code starts with "LEGACY"
             if order.discount_code and order.discount_code.startswith("LEGACY"):
                 discount = discount + legacy_discount(subtotal, order.discount_code)
 
@@ -59,7 +55,6 @@ class PricingService:
         if code == "SAVE20":
             return subtotal * 0.20
         if code.startswith("LEGACY"):
-            # should not reach here when USE_NEW_PRICING is True, but does
             return legacy_discount(subtotal, code)
         return 0.0
 

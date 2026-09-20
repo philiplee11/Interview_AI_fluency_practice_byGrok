@@ -12,7 +12,7 @@ _order_counter = 0
 
 
 def reset():
-    """Test helper — not thread-safe on purpose in some paths."""
+    """Test helper."""
     global _orders, _inventory, _prices, _order_counter
     with _lock:
         _orders = {}
@@ -23,7 +23,6 @@ def reset():
 
 def next_order_id() -> str:
     global _order_counter
-    # BUG intentional: no lock around the increment in the hot path used by some callers
     _order_counter += 1
     return f"ORD-{_order_counter:05d}"
 
@@ -41,8 +40,6 @@ def get_order(order_id: str) -> Optional[Dict[str, Any]]:
 
 def update_order_field(order_id: str, field: str, value: Any) -> bool:
     """Update a single field. Used by concurrent updaters."""
-    # BUG: lock is taken, but the read-modify-write pattern used by callers
-    # outside this function is not always protected.
     with _lock:
         if order_id not in _orders:
             return False
@@ -66,7 +63,7 @@ def get_stock(sku: str) -> int:
 
 
 def adjust_stock(sku: str, delta: int) -> int:
-    """Returns new stock level. Can go negative — that is one of the bugs."""
+    """Returns new stock level."""
     with _lock:
         current = _inventory.get(sku, 0)
         new = current + delta

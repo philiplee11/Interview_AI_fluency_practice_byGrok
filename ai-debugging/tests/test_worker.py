@@ -3,7 +3,6 @@ from src.services.worker import BackgroundWorker
 
 
 def test_worker_stops_and_closes_files():
-    """ISSUE-004: stop() should close files and not leak."""
     w = BackgroundWorker("test-worker")
     w.start()
 

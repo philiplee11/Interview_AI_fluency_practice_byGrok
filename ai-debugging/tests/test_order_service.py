@@ -24,11 +24,9 @@ def test_create_order_basic():
 
 
 def test_concurrent_quantity_updates():
-    """ISSUE-001: concurrent updates should not lose increments."""
     _seed()
     svc = OrderService()
     oid = svc.create_order("c1", [{"sku": "SKU-A", "quantity": 1}])
-    # start at quantity=1
 
     n_threads = 20
     increments_per_thread = 5
@@ -36,7 +34,6 @@ def test_concurrent_quantity_updates():
 
     def worker():
         for _ in range(increments_per_thread):
-            # each call reads then sets — classic lost update
             order = svc.get_order(oid)
             current = order["quantity"]
             svc.update_quantity(oid, current + 1)
@@ -48,5 +45,4 @@ def test_concurrent_quantity_updates():
         t.join()
 
     final = svc.get_order(oid)["quantity"]
-    # This assertion is expected to FAIL with the current buggy code
     assert final == expected, f"Lost updates: expected {expected}, got {final}"
